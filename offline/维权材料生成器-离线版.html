@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>消费纠纷材料整理助手</title>
+<style>
+body{font-family:system-ui,"Microsoft YaHei",sans-serif;background:#f6f7fb;color:#18212f;margin:0}
+main{max-width:760px;margin:32px auto;padding:24px;background:white;border-radius:16px;box-shadow:0 4px 24px #15233a12}
+h1{font-size:26px}p,small{color:#526071;line-height:1.7}
+label{display:block;margin:15px 0 5px;font-weight:600}
+input,textarea,select{width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccd4df;border-radius:8px;font:inherit}
+textarea{min-height:90px}
+button{border:0;background:#2563eb;color:white;border-radius:8px;padding:12px 18px;font:inherit;cursor:pointer;margin:14px 8px 0 0}
+button.secondary{background:#e9eef6;color:#1d3555}
+.notice{background:#fff8e8;padding:12px;border-radius:8px}
+.preview{white-space:pre-wrap;background:#f8fafc;border:1px solid #dce3ec;padding:20px;margin-top:20px;border-radius:8px;line-height:1.9}
+footer{margin-top:20px;font-size:13px;color:#697789}
+@media(max-width:650px){main{margin:0;padding:18px;border-radius:0}}
+</style>
+</head><body><main>
+<h1>消费纠纷材料整理助手</h1>
+<p>免费填写交易情况，生成可编辑的材料草稿和证据清单。所有填写内容仅在当前浏览器处理，不上传服务器。</p>
+<p class="notice">本工具仅用于整理本人陈述，不提供法律代理或立案保证。请核实被告主体、法院管辖、事实和证据。若已进入刑事调查或破产程序，应先确认适用的处理途径。</p>
+<form id="f">
+<label>材料类型</label><select id="type"><option value="claim">民事起诉状草稿</option><option value="report">事实经过陈述（报案/投诉参考）</option></select>
+<label>姓名（可暂用占位符）</label><input id="name" placeholder="张某" autocomplete="off">
+<label>联系方式（选填）</label><input id="contact" placeholder="可暂不填写" autocomplete="off">
+<label>商家名称（请核实合同中的经营主体）</label><input id="merchant" placeholder="例如：某某有限公司" autocomplete="off">
+<label>商家地址（选填）</label><input id="address" placeholder="合同、订单或登记信息中的地址" autocomplete="off">
+<label>交易日期</label><input id="date" type="date">
+<label>支付金额（元）</label><input id="paid" type="number" min="0" step="0.01" placeholder="0.00">
+<label>已退款金额（元）</label><input id="refunded" type="number" min="0" step="0.01" value="0">
+<label>交易/服务内容</label><textarea id="goods" placeholder="购买了什么商品或服务？约定何时交付？"></textarea>
+<label>发生了什么（只写可核实的事实）</label><textarea id="facts" placeholder="何时申请退款？商家如何回应？目前还有哪些未履行义务？"></textarea>
+<label>现有证据（可多选）</label><div>
+<label><input type="checkbox" name="evidence" value="订单或合同" style="width:auto"> 订单或合同</label>
+<label><input type="checkbox" name="evidence" value="付款记录" style="width:auto"> 付款记录</label>
+<label><input type="checkbox" name="evidence" value="聊天记录" style="width:auto"> 聊天记录</label>
+<label><input type="checkbox" name="evidence" value="退款申请记录" style="width:auto"> 退款申请记录</label></div>
+<button type="submit">生成草稿</button><button type="button" class="secondary" id="clear">清空信息</button>
+</form>
+<div id="out" hidden><h2>材料预览</h2><div id="preview" class="preview"></div>
+<button id="word">下载 Word 兼容文档</button>
+<button id="print" class="secondary">打印 / 保存 PDF</button>
+<button id="txt" class="secondary">下载 TXT</button>
+<p><small>Word 兼容文档为 .doc 格式（HTML 内容），可用 Word/WPS 打开后另存为 .docx。PDF 通过浏览器打印功能生成。</small></p></div>
+<footer>不使用第三方统计脚本，不收集表单内容。刷新或关闭页面后填写内容可能丢失。正式提交前请向官方诉讼服务渠道或专业人士核实。</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);let result='';const get=id=>$(id).value.trim();
+function money(x){return Number(x).toFixed(2)}
+function build(){
+const paid=Number(get('paid')),ref=Number(get('refunded'));
+if(!Number.isFinite(paid)||paid<=0||!Number.isFinite(ref)||ref<0||ref>paid){alert('请检查金额：支付金额须大于0，退款金额须在0至支付金额之间');return}
+const name=get('name')||'【原告姓名待填写】',merchant=get('merchant')||'【被告准确名称待核实】',date=get('date')||'【交易日期待填写】',goods=get('goods')||'【交易内容待填写】',facts=get('facts')||'【事实经过待填写】',contact=get('contact')||'【联系方式待填写】',address=get('address')||'【被告地址待核实】',remaining=money(paid-ref);
+const evidence=[...document.querySelectorAll('input[name=evidence]:checked')].map(x=>x.value);
+const checklist='\n\n证据清单（请核对真实性及完整性）\n'+(evidence.length?evidence.map((e,i)=>`${i+1}. ${e}（请注明证明目的）`).join('\n'):'【尚未选择证据，请补充订单、付款、沟通及退款记录等】');
+if(get('type')==='claim'){
+result=`民事起诉状（草稿，待核实）
+
+原告：${name}
+联系方式：${contact}
+被告：${merchant}
+被告地址：${address}
+【双方身份信息、统一社会信用代码、法定代表人等依法按需补充】
+
+诉讼请求（须结合合同和法律关系核实）：
+1. 请求判令被告返还未退交易款人民币 ${remaining} 元。
+2. 【其他请求如利息、违约责任、诉讼费用承担等，请核实后填写】
+
+事实与理由：
+本人于 ${date} 与上述商家发生交易，交易内容为：${goods}。累计支付人民币 ${money(paid)} 元，已收到退款人民币 ${money(ref)} 元，尚未退还人民币 ${remaining} 元。
+本人陈述的其他事实：${facts}
+【请补充合同履行情况、解除或退款依据、催告过程及证据对应关系，不要使用未经证实的指控】
+
+此致
+【有管辖权的人民法院名称待核实】
+
+具状人：${name}
+日期：【签署日期】`+checklist+'\n\n提交前检查：被告主体、管辖法院、诉讼请求的法律依据、身份信息、证据材料、是否存在刑事/破产程序。';
+}else{
+result=`消费纠纷事实陈述（草稿）
+
+陈述人：${name}
+联系方式：${contact}
+涉及商家：${merchant}
+商家地址：${address}
+交易日期：${date}
+交易内容：${goods}
+支付金额：${money(paid)} 元
+已退款：${money(ref)} 元
+未退款：${remaining} 元
+
+事实经过（本人陈述）：
+${facts}
+
+本人希望有关部门依法核实上述情况，并告知适用的投诉、报案或其他救济途径。
+
+陈述人：${name}
+日期：【签署日期】`+checklist+'\n\n注意：本陈述不代表已经认定任何人实施犯罪。';
+}
+$('preview').textContent=result;$('out').hidden=false;$('out').scrollIntoView({behavior:'smooth'});
+}
+function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+$('f').addEventListener('submit',e=>{e.preventDefault();build()});
+$('clear').onclick=()=>{if(confirm('确定清空所有信息？')){$('f').reset();$('out').hidden=true;result=''}};
+$('txt').onclick=()=>download(new Blob(['\ufeff'+result],{type:'text/plain;charset=utf-8'}),'维权材料草稿.txt');
+$('word').onclick=()=>{const escape=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');const html=`<html><head><meta charset="utf-8"></head><body style="font-family:SimSun;line-height:1.8;white-space:pre-wrap">${escape(result)}</body></html>`;download(new Blob(['\ufeff'+html],{type:'application/msword;charset=utf-8'}),'维权材料草稿.doc')};
+$('print').onclick=()=>{const w=window.open('','_blank');if(!w){alert('请允许弹出窗口后重试');return}const d=w.document;d.open();d.write('<!doctype html><html><head><meta charset="utf-8"><title>维权材料草稿</title><style>body{font-family:serif;white-space:pre-wrap;line-height:1.8;margin:24mm}</style></head><body></body></html>');d.close();d.body.textContent=result;w.focus();setTimeout(()=>w.print(),300)};
+</script></body></html>
